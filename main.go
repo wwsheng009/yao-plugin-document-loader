@@ -81,6 +81,8 @@ func getFileType(fileName string) (string, error) {
 		fileType = "HTML"
 	case ".csv":
 		fileType = "CSV"
+	case ".ziw":
+		fileType = "WIZ"
 	case ".txt", ".text", ".log":
 		fileType = "TEXT"
 	// Add more cases as needed
@@ -160,6 +162,9 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 		var loader loaders.Loader
 		var splitter textsplitter.TextSplitter
 		switch ftype {
+		case "WIZ":
+			loader = loaders.NewWIZ(f, finfo.Size())
+			splitter = textsplitter.NewRecursiveCharacter()
 		case "DOCX":
 			loader = loaders.NewDocx(f, finfo.Size())
 			splitter = textsplitter.NewRecursiveCharacter()

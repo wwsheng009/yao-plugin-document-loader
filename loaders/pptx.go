@@ -14,7 +14,7 @@ type PPTX struct {
 	s int64
 }
 
-var _ Loader = Docx{}
+var _ Loader = PPTX{}
 
 // NewHTML creates a new html loader with an io.Reader.
 func NewPPTX(r io.ReaderAt, size int64) PPTX {

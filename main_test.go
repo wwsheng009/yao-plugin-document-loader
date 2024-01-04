@@ -29,7 +29,7 @@ func TestDocumentLoader_Exec(t *testing.T) {
 			name: "test",
 			args: args{
 				method: "text",
-				args:   []interface{}{"./testdata/test.pptx"},
+				args:   []interface{}{"./yaoapp/data/test.ziw"},
 			},
 		},
 	}

@@ -36,9 +36,9 @@ func Read(r io.ReaderAt, size int64) ([]Paragraph, error) {
 			if err != nil {
 				return nil, err
 			}
-			defer f.Close()
 
 			documentXML, err = io.ReadAll(f)
+			f.Close()
 			if err != nil {
 				return nil, err
 			}

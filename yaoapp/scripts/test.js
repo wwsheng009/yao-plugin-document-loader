@@ -50,3 +50,13 @@ function xlsx_password() {
 function pptx() {
   return Process("plugins.docloader.text", getFilePath("test.pptx"));
 }
+
+// yao run scripts.test.md
+function md() {
+  return Process("plugins.docloader.text", getFilePath("test.md"));
+}
+
+// yao run scripts.test.wiz
+function wiz() {
+  return Process("plugins.docloader.text", getFilePath("test1.ziw"));
+}

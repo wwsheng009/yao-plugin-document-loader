@@ -15,19 +15,22 @@ func isSlide(file *zip.File) bool {
 	return matched
 }
 func Read(r io.ReaderAt, size int64) ([][]string, error) {
-	// Open the .docx file
 	zipReader, err := zip.NewReader(r, size)
 	if err != nil {
 		return nil, err
 	}
 
-	slides := make([]*zip.File, 0)
+	texts := make([][]string, 0)
 	for _, file := range zipReader.File {
 		if isSlide(file) {
-			slides = append(slides, file)
+			slideTexts, err := getSingleSlide(file)
+			if err != nil {
+				return nil, err
+			}
+			texts = append(texts, slideTexts)
 		}
 	}
-	return getAllSlideText(slides)
+	return texts, nil
 
 }
 
@@ -68,18 +71,4 @@ func getSingleSlide(s *zip.File) ([]string, error) {
 		}
 	}
 	return slideTexts, nil
-}
-func getAllSlideText(slides []*zip.File) ([][]string, error) {
-
-	texts := make([][]string, 0)
-	for _, s := range slides {
-		slideTexts, err := getSingleSlide((s))
-		if err != nil {
-			return nil, err
-		}
-		if len(slideTexts) != 0 {
-			texts = append(texts, slideTexts)
-		}
-	}
-	return texts, nil
 }
