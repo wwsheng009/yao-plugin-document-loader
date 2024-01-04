@@ -1,0 +1,5 @@
+*.log
+*.so
+*.dll
+db/*
+*.vscode
