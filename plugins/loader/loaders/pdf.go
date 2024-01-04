@@ -22,8 +22,8 @@ var _ Loader = PDF{}
 // PDFOptions are options for the PDF loader.
 type PDFOptions func(pdf *PDF)
 
-// WithPassword sets the password for the PDF.
-func WithPassword(password string) PDFOptions {
+// PdfWithPassword sets the password for the PDF.
+func PdfWithPassword(password string) PDFOptions {
 	return func(pdf *PDF) {
 		pdf.password = password
 	}

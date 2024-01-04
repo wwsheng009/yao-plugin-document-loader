@@ -27,14 +27,7 @@ func (e Excelx) Load(_ context.Context) ([]schema.Document, error) {
 	f, err := excelize.OpenReader(e.r, e.opts...)
 	if err != nil {
 		return nil, err
-		// log.Fatalf("error opening Excel file: %s", err)
 	}
-	// defer func() {
-	// 	if err := f.Close(); err != nil {
-	// 		log.Fatalf("error closing Excel file: %s", err)
-	// 	}
-	// }()
-
 	// Get all sheet names
 	sheets := f.GetSheetList()
 

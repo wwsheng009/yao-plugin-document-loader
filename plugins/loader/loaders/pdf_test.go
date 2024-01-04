@@ -63,7 +63,7 @@ func TestPDFLoader(t *testing.T) {
 		defer f.Close()
 		finfo, err := f.Stat()
 		require.NoError(t, err)
-		p := NewPDF(f, finfo.Size(), WithPassword("password"))
+		p := NewPDF(f, finfo.Size(), PdfWithPassword("password"))
 		docs, err := p.Load(context.Background())
 		require.NoError(t, err)
 
@@ -82,7 +82,7 @@ func TestPDFLoader(t *testing.T) {
 		defer f.Close()
 		finfo, err := f.Stat()
 		require.NoError(t, err)
-		p := NewPDF(f, finfo.Size(), WithPassword("password1"))
+		p := NewPDF(f, finfo.Size(), PdfWithPassword("password1"))
 		docs, err := p.Load(context.Background())
 		require.Errorf(t, err, pdf.ErrInvalidPassword.Error())
 

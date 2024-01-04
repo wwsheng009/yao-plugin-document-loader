@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/xuri/excelize/v2"
 	"github.com/yaoapp/kun/grpc"
 )
 
@@ -70,10 +71,14 @@ func getFileType(fileName string) (string, error) {
 		fileType = "DOCX"
 	case ".xlsx":
 		fileType = "XLSX"
+	case ".pptx":
+		fileType = "PPTX"
 	case ".pdf":
 		fileType = "PDF"
 	case ".md", ".mdx":
 		fileType = "MD"
+	case ".html":
+		fileType = "HTML"
 	case ".csv":
 		fileType = "CSV"
 	case ".txt", ".text", ".log":
@@ -90,7 +95,7 @@ func getFileType(fileName string) (string, error) {
 func getResponse(v interface{}, err error) (*grpc.Response, error) {
 
 	if err != nil {
-		bytes, err := jsoniter.Marshal(map[string]interface{}{"code": 400, "message": err})
+		bytes, err := jsoniter.Marshal(map[string]interface{}{"code": 400, "message": err.Error()})
 		if err != nil {
 			return nil, err
 		}
@@ -158,14 +163,36 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 		case "DOCX":
 			loader = loaders.NewDocx(f, finfo.Size())
 			splitter = textsplitter.NewRecursiveCharacter()
+		case "PPTX":
+			loader = loaders.NewPPTX(f, finfo.Size())
+			splitter = textsplitter.NewRecursiveCharacter()
 		case "XLSX":
-			loader = loaders.NewExcelx(f)
+			if len(args) > 1 {
+				password, ok := args[1].(string)
+				if ok {
+					loader = loaders.NewExcelx(f, excelize.Options{Password: password})
+				}
+			} else {
+				loader = loaders.NewExcelx(f)
+			}
+
 			splitter = textsplitter.NewRecursiveCharacter()
 		case "PDF":
-			loader = loaders.NewPDF(f, finfo.Size())
+
+			if len(args) > 1 {
+				password, ok := args[1].(string)
+				if ok {
+					loader = loaders.NewPDF(f, finfo.Size(), loaders.PdfWithPassword(password))
+				}
+			} else {
+				loader = loaders.NewPDF(f, finfo.Size())
+			}
 			splitter = textsplitter.NewRecursiveCharacter()
 		case "MD":
 			loader = loaders.NewText(f)
+			splitter = textsplitter.NewMarkdownTextSplitter()
+		case "HTML":
+			loader = loaders.NewHTML(f)
 			splitter = textsplitter.NewMarkdownTextSplitter()
 		case "CSV":
 			loader = loaders.NewCSV(f)
