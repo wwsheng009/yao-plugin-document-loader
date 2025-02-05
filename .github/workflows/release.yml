@@ -1,0 +1,44 @@
+name: Go Build and Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Version tags"
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: "1.21.6"
+
+    - name: Build Go project
+      run: |
+        GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o docloader-linux-amd64.so
+        GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o docloader-linux-arm64.so
+        chmod +x docloader-*.so
+        ls -lart
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: docloader-linux-plugin
+        files: |
+          *.so
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get Release URL
+      run: |
+        echo "Release URL: ${{ steps.create_release.outputs.upload_url }}"

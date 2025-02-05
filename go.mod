@@ -1,6 +1,8 @@
 module loader
 
-go 1.20
+go 1.21
+
+toolchain go1.21.6
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
@@ -14,6 +16,7 @@ require (
 	github.com/yaoapp/kun v0.9.0
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
+	golang.org/x/net v0.18.0
 )
 
 require (
@@ -45,7 +48,6 @@ require (
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
 	golang.org/x/crypto v0.15.0 // indirect
 	golang.org/x/image v0.14.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
 	golang.org/x/sys v0.14.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20210821163610-241b8fcbd6c8 // indirect
