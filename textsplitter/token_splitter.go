@@ -10,7 +10,7 @@ const (
 	// nolint:gosec
 	_defaultTokenModelName    = "gpt-3.5-turbo"
 	_defaultTokenEncoding     = "cl100k_base"
-	_defaultTokenChunkSize    = 512
+	_defaultTokenChunkSize    = 1024
 	_defaultTokenChunkOverlap = 100
 )
 

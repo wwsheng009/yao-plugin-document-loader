@@ -32,7 +32,9 @@ type Option func(*Options)
 // WithChunkSize sets the chunk size for a text splitter.
 func WithChunkSize(chunkSize int) Option {
 	return func(o *Options) {
-		o.ChunkSize = chunkSize
+		if chunkSize > 0 {
+			o.ChunkSize = chunkSize
+		}
 	}
 }
 

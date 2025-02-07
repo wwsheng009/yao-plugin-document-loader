@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"regexp"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -84,6 +85,11 @@ func getHtmlText(r io.ReadCloser) (string, error) {
 	}
 	sanitized := bluemonday.UGCPolicy().Sanitize(sel.Text())
 	pagecontent := strings.TrimSpace(sanitized)
+	
+	re := regexp.MustCompile(`\s*\n\s*`)
+	pagecontent = re.ReplaceAllString(pagecontent, "\n")
+	println(pagecontent)
+
 	return pagecontent, nil
 }
 

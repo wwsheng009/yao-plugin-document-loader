@@ -9,7 +9,6 @@ import (
 	"loader/textsplitter"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
@@ -20,6 +19,7 @@ import (
 
 // PDF a simple pdf reader plugin
 type DocumentLoader struct{ grpc.Plugin }
+
 func (plugin *DocumentLoader) setLogFile() {
 	var output io.Writer = os.Stdout
 	//开启日志
@@ -35,80 +35,7 @@ func (plugin *DocumentLoader) setLogFile() {
 	}
 	plugin.Plugin.SetLogger(output, grpc.Trace)
 }
-// isPlainTextFile checks if the file is a plain text file
-func isPlainTextFile(filename string) (bool, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return false, err
-	}
-	defer file.Close()
 
-	// Read the first 512 bytes of the file
-	buf := make([]byte, 512)
-	_, err = file.Read(buf)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if bytes are in printable range
-	for _, b := range buf {
-		if (b < 32 || b > 126) && b != 10 && b != 13 {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// getFileType returns the file type based on the file extension
-func getFileType(fileName string) (string, error) {
-	fileType := "Unknown"
-	info, err := os.Stat(fileName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fileType, err
-			// fmt.Println("File or directory does not exist.")
-		} else {
-			return fileType, err
-			// Handle other potential errors.
-			// fmt.Println("Error:", err)
-		}
-	}
-	if info.IsDir() {
-		return "DIR", nil
-		// fmt.Println(fileName, "is a directory.")
-	}
-
-	ext := strings.ToLower(filepath.Ext(fileName))
-
-	switch ext {
-
-	case ".docx":
-		fileType = "DOCX"
-	case ".xlsx":
-		fileType = "XLSX"
-	case ".pptx":
-		fileType = "PPTX"
-	case ".pdf":
-		fileType = "PDF"
-	case ".md", ".mdx":
-		fileType = "MD"
-	case ".html":
-		fileType = "HTML"
-	case ".csv":
-		fileType = "CSV"
-	case ".ziw":
-		fileType = "WIZ"
-	case ".txt", ".text", ".log":
-		fileType = "TEXT"
-	// Add more cases as needed
-	default:
-		istext, err := isPlainTextFile(fileName)
-		if istext && err == nil {
-			fileType = "TEXT"
-		}
-	}
-	return fileType, nil
-}
 func getResponse(v interface{}, err error) (*grpc.Response, error) {
 
 	if err != nil {
@@ -145,6 +72,10 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 	if err != nil {
 		return getResponse(nil, err)
 	}
+	size := -1
+	if len(args) > 1 {
+		size, ok = args[1].(int)
+	}
 
 	switch strings.ToLower(method) {
 	case "notation":
@@ -179,13 +110,13 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 		switch ftype {
 		case "WIZ":
 			loader = loaders.NewWIZ(f, finfo.Size())
-			splitter = textsplitter.NewRecursiveCharacter()
+			splitter = textsplitter.NewRecursiveCharacter(textsplitter.WithChunkSize(size))
 		case "DOCX":
 			loader = loaders.NewDocx(f, finfo.Size())
-			splitter = textsplitter.NewRecursiveCharacter()
+			splitter = textsplitter.NewRecursiveCharacter(textsplitter.WithChunkSize(size))
 		case "PPTX":
 			loader = loaders.NewPPTX(f, finfo.Size())
-			splitter = textsplitter.NewRecursiveCharacter()
+			splitter = textsplitter.NewRecursiveCharacter(textsplitter.WithChunkSize(size))
 		case "XLSX":
 			if len(args) > 1 {
 				password, ok := args[1].(string)
@@ -196,9 +127,8 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 				loader = loaders.NewExcelx(f)
 			}
 
-			splitter = textsplitter.NewRecursiveCharacter()
+			splitter = textsplitter.NewRecursiveCharacter(textsplitter.WithChunkSize(size))
 		case "PDF":
-
 			if len(args) > 1 {
 				password, ok := args[1].(string)
 				if ok {
@@ -207,19 +137,19 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 			} else {
 				loader = loaders.NewPDF(f, finfo.Size())
 			}
-			splitter = textsplitter.NewRecursiveCharacter()
+			splitter = textsplitter.NewRecursiveCharacter(textsplitter.WithChunkSize(size))
 		case "MD":
 			loader = loaders.NewText(f)
-			splitter = textsplitter.NewMarkdownTextSplitter()
+			splitter = textsplitter.NewMarkdownTextSplitter(textsplitter.WithChunkSize(size))
 		case "HTML":
 			loader = loaders.NewHTML(f)
-			splitter = textsplitter.NewMarkdownTextSplitter()
+			splitter = textsplitter.NewMarkdownTextSplitter(textsplitter.WithChunkSize(size))
 		case "CSV":
 			loader = loaders.NewCSV(f)
-			splitter = textsplitter.NewMarkdownTextSplitter()
+			splitter = textsplitter.NewMarkdownTextSplitter(textsplitter.WithChunkSize(size))
 		case "TEXT":
 			loader = loaders.NewText(f)
-			splitter = textsplitter.NewRecursiveCharacter()
+			splitter = textsplitter.NewRecursiveCharacter(textsplitter.WithChunkSize(size))
 		}
 		if loader == nil {
 			return getResponse(nil, fmt.Errorf("%s not support:%s", ftype, path))
