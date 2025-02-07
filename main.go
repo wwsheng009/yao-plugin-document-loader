@@ -8,6 +8,7 @@ import (
 	"loader/loaders"
 	"loader/textsplitter"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -19,7 +20,21 @@ import (
 
 // PDF a simple pdf reader plugin
 type DocumentLoader struct{ grpc.Plugin }
-
+func (plugin *DocumentLoader) setLogFile() {
+	var output io.Writer = os.Stdout
+	//开启日志
+	logroot := os.Getenv("GOU_TEST_PLG_LOG")
+	if logroot == "" {
+		logroot = "./logs"
+	}
+	if logroot != "" {
+		logfile, err := os.OpenFile(path.Join(logroot, "docloader.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err == nil {
+			output = logfile
+		}
+	}
+	plugin.Plugin.SetLogger(output, grpc.Trace)
+}
 // isPlainTextFile checks if the file is a plain text file
 func isPlainTextFile(filename string) (bool, error) {
 	file, err := os.Open(filename)
@@ -218,8 +233,7 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 }
 
 func main() {
-	var output io.Writer = os.Stdout
 	plugin := &DocumentLoader{}
-	plugin.SetLogger(output, grpc.Trace)
+	plugin.setLogFile()
 	grpc.Serve(plugin)
 }

@@ -10,6 +10,10 @@ import (
 	"github.com/ledongthuc/pdf"
 )
 
+/**
+限制，只能处理文本类型的pdf，不能处理图片、表格、图表等类型的pdf
+*/
+
 // PDF loads text data from an io.Reader.
 type PDF struct {
 	r        io.ReaderAt
@@ -71,11 +75,15 @@ func (p PDF) Load(_ context.Context) ([]schema.Document, error) {
 	numPages := reader.NumPage()
 
 	docs := []schema.Document{}
-
+	
 	// fonts to be used when getting plain text from pages
 	fonts := make(map[string]*pdf.Font)
 	for i := 1; i < numPages+1; i++ {
 		p := reader.Page(i)
+		if len(p.Fonts()) == 0 {
+			// no fonts in page, skip
+			continue;
+		}
 		// add fonts to map
 		for _, name := range p.Fonts() {
 			// only add the font if we don't already have it

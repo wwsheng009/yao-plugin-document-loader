@@ -3,6 +3,8 @@ package loaders
 import (
 	"context"
 	"io"
+	"regexp"
+	"strings"
 
 	"loader/docx"
 	"loader/schema"
@@ -29,20 +31,58 @@ func (d Docx) Load(_ context.Context) ([]schema.Document, error) {
 	if err != nil {
 		return nil, err
 	}
+	re := regexp.MustCompile(`^\s*\n`)
+	re2 := regexp.MustCompile(`^\s*$`)
 
 	docs := []schema.Document{}
 	strs := make([]string, 0)
-	for _, p := range paragraphs {
-		line := ""
-		for _, t := range p.Texts {
-			line += t.Content + "\n"
-			// fmt.Print(t.Content)
-		}
-		if line != "" {
-			strs = append(strs, line)
+
+	line := ""
+	for _, r := range paragraphs {
+		// replace the \u00a0 in the p.Texts
+		for i, t := range r.Texts {
+			r.Texts[i].Content = strings.ReplaceAll(t.Content, "\u00a0", "")
+			r.Texts[i].Content = re.ReplaceAllString(r.Texts[i].Content, "")
+			r.Texts[i].Content = re2.ReplaceAllString(r.Texts[i].Content, "")
+
 		}
 
+		//delete empty line in p.Texts
+		for i, t := range r.Texts {
+			if t.Content == "" {
+				r.Texts = append(r.Texts[:i], r.Texts[i+1:]...)
+			}
+		}
+
+		for _, t := range r.Texts {
+			line += t.Content + "\n"
+		}
+		// }
+
+		for _, t := range r.Hyperlink {
+			//remove the end \n in line
+			line = strings.TrimSuffix(line, "\n")
+			line += t.Content + "\n"
+		}
+		// for _, r := range r.Runs {
+		// 使用页面分隔符来分割段落
+		if len(r.LastRenderedPageBreak) > 0 {
+			strs = append(strs, line)
+			line = ""
+		}
+
+		// 如果需要使用空行来分割段落，可以使用以下代码
+		// if line != "" && len(p.Texts) == 0 {
+		// 	strs = append(strs, line)
+		// 	line = ""
+		// }
+
 	}
+	if line != "" {
+		strs = append(strs, line)
+		line = ""
+	}
+
 	numPages := len(strs)
 	for i, v := range strs {
 		docs = append(docs, schema.Document{
@@ -54,15 +94,6 @@ func (d Docx) Load(_ context.Context) ([]schema.Document, error) {
 		})
 	}
 	return docs, nil
-
-	// return []schema.Document{
-	// 	{
-	// 		PageContent: pagecontent,
-	// 		Metadata: map[string]any{
-	// 			"total_paragraphs": len(paragraphs),
-	// 		},
-	// 	},
-	// }, nil
 }
 
 // LoadAndSplit reads text data from the io.Reader and splits it into multiple

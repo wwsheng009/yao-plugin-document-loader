@@ -15,7 +15,9 @@ type Body struct {
 }
 
 type Paragraph struct {
-	Texts []Text `xml:"r>t"`
+	Texts                 []Text `xml:"r>t"`
+	LastRenderedPageBreak []bool `xml:"r>lastRenderedPageBreak"`
+	Hyperlink             []Text `xml:"hyperlink>r>t"`
 }
 
 type Text struct {

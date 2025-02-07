@@ -1,8 +1,8 @@
 module loader
 
-go 1.21
+go 1.23.0
 
-toolchain go1.21.6
+// toolchain go1.21.6
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
