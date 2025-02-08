@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"unicode/utf8"
 
 	"gitlab.com/golang-commonmark/markdown"
 )
@@ -18,9 +17,14 @@ func NewMarkdownTextSplitter(opts ...Option) *MarkdownTextSplitter {
 	}
 
 	sp := &MarkdownTextSplitter{
-		ChunkSize:      options.ChunkSize,
-		ChunkOverlap:   options.ChunkOverlap,
-		SecondSplitter: options.SecondSplitter,
+		ChunkSize:        options.ChunkSize,
+		ChunkOverlap:     options.ChunkOverlap,
+		SecondSplitter:   options.SecondSplitter,
+		CodeBlocks:       options.CodeBlocks,
+		ReferenceLinks:   options.ReferenceLinks,
+		HeadingHierarchy: options.KeepHeadingHierarchy,
+		JoinTableRows:    options.JoinTableRows,
+		LenFunc:          options.LenFunc,
 	}
 
 	if sp.SecondSplitter == nil {
@@ -32,6 +36,7 @@ func NewMarkdownTextSplitter(opts ...Option) *MarkdownTextSplitter {
 				"\n",   // new line
 				" ",    // space
 			}),
+			WithLenFunc(options.LenFunc),
 		)
 	}
 
@@ -42,14 +47,18 @@ var _ TextSplitter = (*MarkdownTextSplitter)(nil)
 
 // MarkdownTextSplitter markdown header text splitter.
 //
-// Now, we support H1/H2/H3/H4/H5/H6, BulletList, OrderedList, Table, Paragraph, Blockquote,
-// other format will be ignored. If your origin document is HTML, you purify and convert to markdown,
+// If your origin document is HTML, you purify and convert to markdown,
 // then split it.
 type MarkdownTextSplitter struct {
 	ChunkSize    int
 	ChunkOverlap int
 	// SecondSplitter splits paragraphs
-	SecondSplitter TextSplitter
+	SecondSplitter   TextSplitter
+	CodeBlocks       bool
+	ReferenceLinks   bool
+	HeadingHierarchy bool
+	JoinTableRows    bool
+	LenFunc          func(string) int
 }
 
 // SplitText splits a text into multiple text.
@@ -58,12 +67,18 @@ func (sp MarkdownTextSplitter) SplitText(text string) ([]string, error) {
 	tokens := mdParser.Parse([]byte(text))
 
 	mc := &markdownContext{
-		startAt:        0,
-		endAt:          len(tokens),
-		tokens:         tokens,
-		chunkSize:      sp.ChunkSize,
-		chunkOverlap:   sp.ChunkOverlap,
-		secondSplitter: sp.SecondSplitter,
+		startAt:                0,
+		endAt:                  len(tokens),
+		tokens:                 tokens,
+		chunkSize:              sp.ChunkSize,
+		chunkOverlap:           sp.ChunkOverlap,
+		secondSplitter:         sp.SecondSplitter,
+		renderCodeBlocks:       sp.CodeBlocks,
+		useInlineContent:       !sp.ReferenceLinks,
+		joinTableRows:          sp.JoinTableRows,
+		hTitleStack:            []string{},
+		hTitlePrependHierarchy: sp.HeadingHierarchy,
+		lenFunc:                sp.LenFunc,
 	}
 
 	chunks := mc.splitText()
@@ -82,8 +97,12 @@ type markdownContext struct {
 
 	// hTitle represents the current header(H1、H2 etc.) content
 	hTitle string
+	// hTitleStack represents the hierarchy of headers
+	hTitleStack []string
 	// hTitlePrepended represents whether hTitle has been appended to chunks
 	hTitlePrepended bool
+	// hTitlePrependHierarchy represents whether hTitle should contain the title hierarchy or only the last title
+	hTitlePrependHierarchy bool
 
 	// orderedList represents whether current list is ordered list
 	orderedList bool
@@ -106,9 +125,25 @@ type markdownContext struct {
 
 	// secondSplitter re-split markdown single long paragraph into chunks
 	secondSplitter TextSplitter
+
+	// renderCodeBlocks determines whether indented and fenced code blocks should
+	// be rendered
+	renderCodeBlocks bool
+
+	// useInlineContent determines whether the default inline content is rendered
+	useInlineContent bool
+
+	// joinTableRows determines whether a chunk should contain multiple table rows,
+	// or if each row in a table should be split into a separate chunk.
+	joinTableRows bool
+
+	// lenFunc represents the function to calculate the length of a string.
+	lenFunc func(string) int
 }
 
 // splitText splits Markdown text.
+//
+//nolint:cyclop
 func (mc *markdownContext) splitText() []string {
 	for idx := mc.startAt; idx < mc.endAt; {
 		token := mc.tokens[idx]
@@ -127,6 +162,12 @@ func (mc *markdownContext) splitText() []string {
 			mc.onMDOrderedList()
 		case *markdown.ListItemOpen:
 			mc.onMDListItem()
+		case *markdown.CodeBlock:
+			mc.onMDCodeBlock()
+		case *markdown.Fence:
+			mc.onMDFence()
+		case *markdown.Hr:
+			mc.onMDHr()
 		default:
 			mc.startAt = indexOfCloseTag(mc.tokens, idx) + 1
 		}
@@ -147,6 +188,7 @@ func (mc *markdownContext) clone(startAt, endAt int) *markdownContext {
 		tokens: subTokens,
 
 		hTitle:          mc.hTitle,
+		hTitleStack:     mc.hTitleStack,
 		hTitlePrepended: mc.hTitlePrepended,
 
 		orderedList: mc.orderedList,
@@ -157,6 +199,8 @@ func (mc *markdownContext) clone(startAt, endAt int) *markdownContext {
 		chunkSize:      mc.chunkSize,
 		chunkOverlap:   mc.chunkOverlap,
 		secondSplitter: mc.secondSplitter,
+
+		lenFunc: mc.lenFunc,
 	}
 }
 
@@ -184,6 +228,24 @@ func (mc *markdownContext) onMDHeader() {
 
 	hm := repeatString(header.HLevel, "#")
 	mc.hTitle = fmt.Sprintf("%s %s", hm, inline.Content)
+
+	// fill titlestack with empty strings up to the current level
+	for len(mc.hTitleStack) < header.HLevel {
+		mc.hTitleStack = append(mc.hTitleStack, "")
+	}
+
+	if mc.hTitlePrependHierarchy {
+		// Build the new title from the title stack, joined by newlines, while ignoring empty entries
+		mc.hTitleStack = append(mc.hTitleStack[:header.HLevel-1], mc.hTitle)
+		mc.hTitle = ""
+		for _, t := range mc.hTitleStack {
+			if t != "" {
+				mc.hTitle = strings.Join([]string{mc.hTitle, t}, "\n")
+			}
+		}
+		mc.hTitle = strings.TrimLeft(mc.hTitle, "\n")
+	}
+
 	mc.hTitlePrepended = false
 }
 
@@ -378,14 +440,22 @@ func (mc *markdownContext) splitTableRows(header []string, bodies [][]string) {
 		return
 	}
 
-	// append table header
 	for _, row := range bodies {
 		line := tableRowInMarkdown(row)
 
-		mc.joinSnippet(fmt.Sprintf("%s\n%s", headerMD, line))
+		// If we're at the start of the current snippet, or adding the current line would
+		// overflow the chunk size, prepend the header to the line (so that the new chunk
+		// will include the table header).
+		if len(mc.curSnippet) == 0 || mc.lenFunc(mc.curSnippet+line) >= mc.chunkSize {
+			line = fmt.Sprintf("%s\n%s", headerMD, line)
+		}
 
-		// keep every row in a single Document
-		mc.applyToChunks()
+		mc.joinSnippet(line)
+
+		// If we're not joining table rows, create a new chunk.
+		if !mc.joinTableRows {
+			mc.applyToChunks()
+		}
 	}
 }
 
@@ -482,6 +552,71 @@ func (mc *markdownContext) onTableBody() [][]string {
 	}
 }
 
+// onMDCodeBlock splits indented code block.
+func (mc *markdownContext) onMDCodeBlock() {
+	defer func() {
+		mc.startAt++
+	}()
+
+	if !mc.renderCodeBlocks {
+		return
+	}
+
+	codeblock, ok := mc.tokens[mc.startAt].(*markdown.CodeBlock)
+	if !ok {
+		return
+	}
+
+	// CommonMark Spec 4.4: Indented Code Blocks
+	// An indented code block is composed of one or more indented chunks
+	// separated by blank lines. An indented chunk is a sequence of
+	// non-blank lines, each preceded by four or more spaces of indentation.
+
+	//nolint:gomnd
+	codeblockMD := "\n" + formatWithIndent(codeblock.Content, strings.Repeat(" ", 4))
+
+	// adding this as a single snippet means that long codeblocks will be split
+	// as text, i.e. they won't be properly wrapped. This is not ideal, but
+	// matches was python langchain does.
+	mc.joinSnippet(codeblockMD)
+}
+
+// onMDFence splits fenced code block.
+func (mc *markdownContext) onMDFence() {
+	defer func() {
+		mc.startAt++
+	}()
+
+	if !mc.renderCodeBlocks {
+		return
+	}
+
+	fence, ok := mc.tokens[mc.startAt].(*markdown.Fence)
+	if !ok {
+		return
+	}
+
+	fenceMD := fmt.Sprintf("\n```%s\n%s```\n", fence.Params, fence.Content)
+
+	// adding this as a single snippet means that long fenced blocks will be split
+	// as text, i.e. they won't be properly wrapped. This is not ideal, but matches
+	// was python langchain does.
+	mc.joinSnippet(fenceMD)
+}
+
+// onMDHr splits thematic break.
+func (mc *markdownContext) onMDHr() {
+	defer func() {
+		mc.startAt++
+	}()
+
+	if _, ok := mc.tokens[mc.startAt].(*markdown.Hr); !ok {
+		return
+	}
+
+	mc.joinSnippet("\n---")
+}
+
 // joinSnippet join sub snippet to current total snippet.
 func (mc *markdownContext) joinSnippet(snippet string) {
 	if mc.curSnippet == "" {
@@ -490,7 +625,7 @@ func (mc *markdownContext) joinSnippet(snippet string) {
 	}
 
 	// check whether current chunk exceeds chunk size, if so, apply to chunks
-	if utf8.RuneCountInString(mc.curSnippet)+utf8.RuneCountInString(snippet) >= mc.chunkSize {
+	if mc.lenFunc(mc.curSnippet+snippet) >= mc.chunkSize {
 		mc.applyToChunks()
 		mc.curSnippet = snippet
 	} else {
@@ -507,7 +642,7 @@ func (mc *markdownContext) applyToChunks() {
 	var chunks []string
 	if mc.curSnippet != "" {
 		// check whether current chunk is over ChunkSize，if so, re-split current chunk
-		if utf8.RuneCountInString(mc.curSnippet) <= mc.chunkSize+mc.chunkOverlap {
+		if mc.lenFunc(mc.curSnippet) <= mc.chunkSize+mc.chunkOverlap {
 			chunks = []string{mc.curSnippet}
 		} else {
 			// split current snippet to chunks
@@ -539,8 +674,94 @@ func (mc *markdownContext) applyToChunks() {
 // splitInline splits inline
 //
 // format: Link/Image/Text
+//
+//nolint:cyclop
 func (mc *markdownContext) splitInline(inline *markdown.Inline) string {
-	return inline.Content
+	if len(inline.Children) == 0 || mc.useInlineContent {
+		return inline.Content
+	}
+
+	var content string
+
+	var currentLink *markdown.LinkOpen
+
+	// CommonMark Spec 6: Inlines
+	// - Soft linebreaks
+	// - Hard linebreaks
+	// - Emphasis and strong emphasis
+	// - Text
+	// - Raw HTML
+	// - Code spans
+	// - Links
+	// - Images
+	// - Autolinks
+	for _, child := range inline.Children {
+		switch token := child.(type) {
+		case *markdown.Softbreak:
+			content += "\n"
+		case *markdown.Hardbreak:
+			// CommonMark Spec 6.7: Hard line breaks
+			// For a more visible alternative, a backslash before the line
+			// ending may be used instead of two or more spaces
+			content += "\\\n"
+		case *markdown.StrongOpen, *markdown.StrongClose:
+			content += "**"
+		case *markdown.EmphasisOpen, *markdown.EmphasisClose:
+			content += "*"
+		case *markdown.StrikethroughOpen, *markdown.StrikethroughClose:
+			content += "~~"
+		case *markdown.Text:
+			content += token.Content
+		case *markdown.HTMLInline:
+			content += token.Content
+		case *markdown.CodeInline:
+			content += fmt.Sprintf("`%s`", token.Content)
+		case *markdown.LinkOpen:
+			content += "["
+			// CommonMark Spec 6.3:
+			// Links may not contain other links, at any level of nesting.
+			// If multiple otherwise valid link definitions appear nested
+			// inside each other, the inner-most definition is used.
+			currentLink = token
+		case *markdown.LinkClose:
+			content += mc.inlineOnLinkClose(currentLink)
+		case *markdown.Image:
+			content += mc.inlineOnImage(token)
+		}
+	}
+
+	return content
+}
+
+func (mc *markdownContext) inlineOnLinkClose(link *markdown.LinkOpen) string {
+	switch {
+	case link.Href == "":
+		return "]()"
+	case link.Title != "":
+		return fmt.Sprintf(`](%s "%s")`, link.Href, link.Title)
+	default:
+		return fmt.Sprintf(`](%s)`, link.Href)
+	}
+}
+
+func (mc *markdownContext) inlineOnImage(image *markdown.Image) string {
+	var label string
+
+	// CommonMark spec 6.4: Images
+	// Though this spec is concerned with parsing, not rendering, it is
+	// recommended that in rendering to HTML, only the plain string content
+	// of the image description be used.
+	for _, token := range image.Tokens {
+		if text, ok := token.(*markdown.Text); ok {
+			label += text.Content
+		}
+	}
+
+	if image.Title == "" {
+		return fmt.Sprintf(`![%s](%s)`, label, image.Src)
+	}
+
+	return fmt.Sprintf(`![%s](%s "%s")`, label, image.Src, image.Title)
 }
 
 // closeTypes represents the close operation type for each open operation type.

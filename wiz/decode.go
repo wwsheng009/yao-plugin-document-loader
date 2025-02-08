@@ -88,7 +88,6 @@ func getHtmlText(r io.ReadCloser) (string, error) {
 	
 	re := regexp.MustCompile(`\s*\n\s*`)
 	pagecontent = re.ReplaceAllString(pagecontent, "\n")
-	println(pagecontent)
 
 	return pagecontent, nil
 }
