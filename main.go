@@ -140,7 +140,7 @@ func (doc *DocumentLoader) Exec(method string, args ...interface{}) (*grpc.Respo
 			splitter = textsplitter.NewRecursiveCharacter(textsplitter.WithChunkSize(size))
 		case "MD":
 			loader = loaders.NewText(f)
-			splitter = textsplitter.NewMarkdownTextSplitter(textsplitter.WithChunkSize(size))
+			splitter = textsplitter.NewMarkdownTextSplitter(textsplitter.WithChunkSize(size), textsplitter.WithCodeBlocks(true))
 		case "HTML":
 			loader = loaders.NewHTML(f)
 			splitter = textsplitter.NewMarkdownTextSplitter(textsplitter.WithChunkSize(size))
