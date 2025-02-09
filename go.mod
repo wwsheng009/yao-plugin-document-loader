@@ -12,7 +12,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.26
 	github.com/pkoukk/tiktoken-go v0.1.6
 	github.com/stretchr/testify v1.9.0
-	github.com/tmc/langchaingo v0.1.12
 	github.com/xuri/excelize/v2 v2.8.0
 	github.com/yaoapp/kun v0.9.0
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a

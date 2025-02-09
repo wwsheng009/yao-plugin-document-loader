@@ -3,13 +3,10 @@ package loaders
 import (
 	"context"
 	"io"
-	"strings"
 
 	"loader/schema"
 	"loader/textsplitter"
-
-	"github.com/PuerkitoBio/goquery"
-	"github.com/microcosm-cc/bluemonday"
+	"loader/utils"
 )
 
 // HTML loads parses and sanitizes html content from an io.Reader.
@@ -26,24 +23,27 @@ func NewHTML(r io.Reader) HTML {
 
 // Load reads from the io.Reader and returns a single document with the data.
 func (h HTML) Load(_ context.Context) ([]schema.Document, error) {
-	doc, err := goquery.NewDocumentFromReader(h.r)
+	// doc, err := goquery.NewDocumentFromReader(h.r)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// var sel *goquery.Selection
+	// if doc.Has("body") != nil {
+	// 	sel = doc.Find("body").Contents()
+	// } else {
+	// 	sel = doc.Contents()
+	// }
+
+	// sanitized := bluemonday.UGCPolicy().Sanitize(sel.Text())
+	// pagecontent := strings.TrimSpace(sanitized)
+	document, err := utils.GetHtmlText(h.r)
 	if err != nil {
 		return nil, err
 	}
-
-	var sel *goquery.Selection
-	if doc.Has("body") != nil {
-		sel = doc.Find("body").Contents()
-	} else {
-		sel = doc.Contents()
-	}
-
-	sanitized := bluemonday.UGCPolicy().Sanitize(sel.Text())
-	pagecontent := strings.TrimSpace(sanitized)
-
 	return []schema.Document{
 		{
-			PageContent: pagecontent,
+			PageContent: document,
 			Metadata:    map[string]any{},
 		},
 	}, nil

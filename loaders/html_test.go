@@ -2,6 +2,7 @@ package loaders
 
 import (
 	"context"
+	"loader/textsplitter"
 	"os"
 	"testing"
 
@@ -47,4 +48,20 @@ func TestHTMLLoader(t *testing.T) {
 
 	expectedMetadata := map[string]any{}
 	assert.Equal(t, expectedMetadata, docs[0].Metadata)
+}
+
+func TestHTML_LoadAndSplit(t *testing.T) {
+
+	t.Parallel()
+	file, err := os.Open("./testdata/test.html")
+	require.NoError(t, err)
+
+	loader := NewHTML(file)
+	docs, err :=loader.LoadAndSplit(context.Background(), textsplitter.NewMarkdownTextSplitter())
+	require.NoError(t, err)
+	// require.Len(t, docs, 1)
+	//print the page content in docs
+	for _, doc := range docs {
+		println(doc.PageContent)
+	}
 }

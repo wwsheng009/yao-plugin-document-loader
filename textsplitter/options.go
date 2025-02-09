@@ -25,15 +25,15 @@ func DefaultOptions() Options {
 	return Options{
 		ChunkSize:         _defaultTokenChunkSize,
 		ChunkOverlap:      _defaultTokenChunkOverlap,
-		Separators:        []string{"\n\n", "\n", " ", ""},
-		KeepSeparator:     false,
+		Separators:        []string{"\n\n", "\n"},
+		KeepSeparator:     true,
 		LenFunc:           utf8.RuneCountInString,
 		ModelName:         _defaultTokenModelName,
 		EncodingName:      _defaultTokenEncoding,
 		AllowedSpecial:    []string{},
 		DisallowedSpecial: []string{"all"},
 
-		KeepHeadingHierarchy: false,
+		KeepHeadingHierarchy: true,
 	}
 }
 

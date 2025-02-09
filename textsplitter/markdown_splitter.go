@@ -34,7 +34,6 @@ func NewMarkdownTextSplitter(opts ...Option) *MarkdownTextSplitter {
 			WithSeparators([]string{
 				"\n\n", // new line
 				"\n",   // new line
-				" ",    // space
 			}),
 			WithLenFunc(options.LenFunc),
 		)
