@@ -25,7 +25,7 @@ func DefaultOptions() Options {
 	return Options{
 		ChunkSize:         _defaultTokenChunkSize,
 		ChunkOverlap:      _defaultTokenChunkOverlap,
-		Separators:        []string{"\n\n", "\n"},
+		Separators:        []string{"\n\n", "\n", " ", ""},
 		KeepSeparator:     true,
 		LenFunc:           utf8.RuneCountInString,
 		ModelName:         _defaultTokenModelName,

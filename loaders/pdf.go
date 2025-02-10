@@ -75,14 +75,14 @@ func (p PDF) Load(_ context.Context) ([]schema.Document, error) {
 	numPages := reader.NumPage()
 
 	docs := []schema.Document{}
-	
+
 	// fonts to be used when getting plain text from pages
 	fonts := make(map[string]*pdf.Font)
 	for i := 1; i < numPages+1; i++ {
 		p := reader.Page(i)
 		if len(p.Fonts()) == 0 {
 			// no fonts in page, skip
-			continue;
+			continue
 		}
 		// add fonts to map
 		for _, name := range p.Fonts() {
@@ -108,6 +108,7 @@ func (p PDF) Load(_ context.Context) ([]schema.Document, error) {
 		// println(x1)
 
 		// add the document to the doc list
+		text += "\n"
 		docs = append(docs, schema.Document{
 			PageContent: text,
 			Metadata: map[string]any{

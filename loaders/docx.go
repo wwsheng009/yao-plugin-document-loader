@@ -66,16 +66,16 @@ func (d Docx) Load(_ context.Context) ([]schema.Document, error) {
 		}
 		// for _, r := range r.Runs {
 		// 使用页面分隔符来分割段落
-		if len(r.LastRenderedPageBreak) > 0 {
-			strs = append(strs, line)
-			line = ""
-		}
-
-		// 如果需要使用空行来分割段落，可以使用以下代码
-		// if line != "" && len(p.Texts) == 0 {
+		// if len(r.LastRenderedPageBreak) > 0 {
 		// 	strs = append(strs, line)
 		// 	line = ""
 		// }
+
+		// 如果需要使用空行来分割段落，可以使用以下代码
+		if line != "" && len(r.Texts) == 0 {
+			strs = append(strs, line)
+			line = ""
+		}
 
 	}
 	if line != "" {
